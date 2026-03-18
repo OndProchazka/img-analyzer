@@ -1,5 +1,0 @@
-img_analysis_demo_pipeline
-main
-pipeline
-product_categorizer
-web

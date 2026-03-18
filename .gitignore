@@ -4,5 +4,7 @@ __pycache__/
 .env
 .envrc
 pat.txt
-
 .zen/
+build/
+*.egg-info/
+.claude/

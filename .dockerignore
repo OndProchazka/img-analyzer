@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.envrc
+.git/
+.github/
+.claude/
+.zen/
+build/
+*.egg-info/
+DPA_Category_Framework_3.xlsx
+sql.txt
+pat.txt
+README.md

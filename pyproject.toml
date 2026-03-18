@@ -8,6 +8,13 @@ dependencies = [
     "google-cloud-vision>=3.4.0",
     "pillow>=10.0.0",
     "requests>=2.31.0",
+    "google-genai>=1.0.0",
+    "fastapi>=0.133.0",
+    "uvicorn>=0.41.0",
+]
+
+[project.optional-dependencies]
+pipeline = [
     "zenml[local]==0.93.3",
     "kfp>=2.6.0",
     "urllib3<2.6.0",
@@ -27,12 +34,11 @@ dependencies = [
     "pandas>=3.0.1",
     "polars>=1.38.1",
     "pyarrow>=23.0.1",
-    "google-genai>=1.0.0",
     "rich>=13.0.0",
-    "ruff>=0.15.2",
-    "fastapi>=0.133.0",
-    "uvicorn>=0.41.0",
     "secure>=1.0.1",
+]
+dev = [
+    "ruff>=0.15.2",
 ]
 
 [tool.ruff]

@@ -152,6 +152,63 @@
     /* Results */
     .results { display: flex; flex-direction: column; gap: 20px; }
 
+    /* Hero score */
+    .hero-score {
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 28px 32px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      color: #fff;
+    }
+    .hero-dial {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      flex-shrink: 0;
+    }
+    .hero-dial svg { width: 100px; height: 100px; transform: rotate(-90deg); }
+    .hero-dial-num {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .hero-text { flex: 1; }
+    .hero-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      opacity: 0.5;
+      margin-bottom: 4px;
+    }
+    .hero-improvements-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      opacity: 0.45;
+      margin: 14px 0 8px;
+    }
+    .hero-improvement-list {
+      margin: 0;
+      padding-left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .hero-improvement-list li {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.45;
+    }
+
     .card {
       background: #fff;
       border: 1px solid #e5e7eb;
@@ -171,14 +228,79 @@
     .card-body { padding: 16px 18px; }
 
     /* Score bar */
+    .score-block { margin-bottom: 10px; }
+    .score-block:last-child { margin-bottom: 0; }
     .score-row {
       display: flex;
       align-items: center;
       gap: 10px;
-      margin-bottom: 10px;
+      margin-bottom: 2px;
     }
-    .score-row:last-child { margin-bottom: 0; }
-    .score-label { font-size: 0.78rem; color: #6b7280; width: 160px; flex-shrink: 0; }
+    .score-explain {
+      font-size: 0.71rem;
+      color: #6b7280;
+      font-style: italic;
+      padding-left: 170px;
+      line-height: 1.4;
+      margin-bottom: 2px;
+    }
+    .score-label {
+      font-size: 0.78rem; color: #6b7280; width: 160px; flex-shrink: 0;
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .score-label .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #e5e7eb;
+      color: #6b7280;
+      font-size: 0.6rem;
+      font-weight: 700;
+      font-style: italic;
+      font-family: Georgia, serif;
+      flex-shrink: 0;
+      cursor: help;
+      transition: background 0.15s, color 0.15s;
+    }
+    .score-label:hover .info-icon {
+      background: #6366f1;
+      color: #fff;
+    }
+    .score-label .tooltip {
+      visibility: hidden;
+      opacity: 0;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 0;
+      width: 260px;
+      background: #1a1a2e;
+      color: #fff;
+      font-size: 0.72rem;
+      font-style: normal;
+      font-weight: 400;
+      line-height: 1.45;
+      padding: 8px 10px;
+      border-radius: 6px;
+      z-index: 10;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      cursor: default;
+    }
+    .score-label .tooltip::after {
+      content: '';
+      position: absolute;
+      top: 100%;
+      left: 16px;
+      border: 5px solid transparent;
+      border-top-color: #1a1a2e;
+    }
+    .score-label:hover .tooltip { visibility: visible; opacity: 1; }
     .bar-wrap {
       flex: 1;
       height: 6px;
@@ -220,12 +342,11 @@
     .badge.risk-medium { background: #fef9c3; color: #92400e; }
     .badge.risk-high   { background: #fee2e2; color: #991b1b; }
     .badge.hierarchy   { background: #ede9fe; color: #5b21b6; }
+    .badge.wcag-aaa    { background: #dcfce7; color: #166534; }
+    .badge.wcag-aa     { background: #d1fae5; color: #065f46; }
+    .badge.wcag-large  { background: #fef9c3; color: #92400e; }
+    .badge.wcag-fail   { background: #fee2e2; color: #991b1b; }
 
-    .notes-text {
-      font-size: 0.84rem;
-      color: #374151;
-      line-height: 1.6;
-    }
   </style>
 </head>
 <body>
@@ -319,10 +440,19 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parameters: { image_url: url } }),
       });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        let msg = `HTTP ${resp.status}`;
+        try { const j = JSON.parse(text); msg = j.error || j.detail || msg; } catch {}
+        setState('error', msg);
+        return;
+      }
+
       const json = await resp.json();
 
-      if (!resp.ok || !json.success) {
-        const msg = json.error || json.detail || `HTTP ${resp.status}`;
+      if (!json.success) {
+        const msg = json.error || json.detail || 'Analysis failed';
         setState('error', msg);
         return;
       }
@@ -366,26 +496,14 @@
   function renderResults(d, url) {
     results.innerHTML = '';
 
+    // Hero — overall score + improvements
+    results.appendChild(heroCard(d));
+
     // Visual Quality
     results.appendChild(card('Visual Quality', visualCard(d)));
 
     // Anchoring
     results.appendChild(card('Anchoring & Pricing', anchoringCard(d)));
-
-    // Rubric
-    results.appendChild(card('Scoring Rubric', rubricCard()));
-
-    // Notes
-    if (d.img_overall_notes) {
-      const n = document.createElement('div');
-      n.className = 'card';
-      n.innerHTML = `
-        <div class="card-header">Notes</div>
-        <div class="card-body">
-          <p class="notes-text">${escHtml(d.img_overall_notes)}</p>
-        </div>`;
-      results.appendChild(n);
-    }
   }
 
   function card(title, bodyEl) {
@@ -402,24 +520,59 @@
     return c;
   }
 
+  function heroCard(d) {
+    const score = d.img_overall_creative_score ?? 0;
+    const pct   = Math.round(score * 100);
+    const color = pct > 80 ? '#22c55e' : pct > 50 ? '#f59e0b' : '#ef4444';
+
+    // SVG ring: r=44 → circumference ≈ 276.5
+    const r = 44, circ = 2 * Math.PI * r;
+    const dash = (pct / 100) * circ;
+
+    const improvItems = (d.img_improvements || [])
+      .map(s => `<li>${escHtml(s)}</li>`).join('');
+
+    const el = document.createElement('div');
+    el.className = 'hero-score';
+    el.innerHTML = `
+      <div class="hero-dial">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="${r}" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="8"/>
+          <circle cx="50" cy="50" r="${r}" fill="none" stroke="${color}" stroke-width="8"
+            stroke-dasharray="${dash.toFixed(1)} ${circ.toFixed(1)}"
+            stroke-linecap="round"/>
+        </svg>
+        <div class="hero-dial-num">${pct}</div>
+      </div>
+      <div class="hero-text">
+        <div class="hero-label">Overall Creative Score</div>
+        <div style="font-size:0.88rem;opacity:0.65;line-height:1.5;max-width:480px">
+          Composite across attention, clarity, branding, offer strength, product presentation, and craft.
+        </div>
+        ${improvItems ? `
+          <div class="hero-improvements-title">Suggested improvements</div>
+          <ul class="hero-improvement-list">${improvItems}</ul>` : ''}
+      </div>`;
+    return el;
+  }
+
   function visualCard(d) {
     const wrap = document.createElement('div');
 
-    const scores = [
-      ['Overall creative',        d.img_overall_creative_score],
-      ['Attention',               d.img_attention_score],
-      ['Message clarity',         d.img_message_clarity_score_v2],
-      ['Branding',                d.img_branding_score],
-      ['Offer strength',          d.img_offer_strength_score],
-      ['Product presentation',    d.img_product_presentation_score],
-      ['Readability (mobile)',    d.img_text_readability_mobile],
-      ['Text contrast vs bg',     d.img_text_contrast_bg],
-      ['Text contrast vs product', d.img_text_contrast_product],
-      ['Whitespace',              d.img_whitespace_score],
+    const subScores = [
+      ['Attention',                d.img_attention_score,                d.img_justification_attention],
+      ['Message clarity',          d.img_message_clarity_score_v2,       d.img_justification_message_clarity],
+      ['Branding',                 d.img_branding_score,                 d.img_justification_branding],
+      ['Offer strength',           d.img_offer_strength_score,           d.img_justification_offer_strength],
+      ['Product presentation',     d.img_product_presentation_score,     d.img_justification_product_presentation],
+      ['Readability',              d.img_readability_score,              d.img_justification_readability],
+      ['Safe zone',                 d.img_safe_zone_score,               d.img_justification_safe_zone],
+      ['Text contrast vs bg',      d.img_text_contrast_bg,              d.img_text_contrast_justification, d.img_text_contrast_ratio, d.img_text_contrast_wcag, d.img_text_contrast_ratio_min, d.img_text_contrast_ratio_max],
+      ['Whitespace',               d.img_whitespace_score,              d.img_justification_whitespace],
     ];
-    scores.forEach(([label, val]) => {
+    subScores.forEach(([label, val, explain, ratio, wcag, ratioMin, ratioMax]) => {
       if (val == null) return;
-      wrap.appendChild(scoreBar(label, val));
+      wrap.appendChild(scoreBar(label, val, explain, ratio, wcag, ratioMin, ratioMax));
     });
 
     // KV extras
@@ -427,6 +580,13 @@
     kv.className = 'kv-grid';
     kv.style.marginTop = '14px';
 
+    if (d.img_ad_format || d.img_dimensions) {
+      const parts = [d.img_ad_format, d.img_dimensions].filter(Boolean).join(' · ');
+      kvRow(kv, 'Ad format', `<span class="badge hierarchy">${escHtml(parts)}</span>`);
+    }
+    if (d.img_safe_zone_elements_at_risk && d.img_safe_zone_elements_at_risk.length > 0) {
+      kvRow(kv, 'Safe zone risks', d.img_safe_zone_elements_at_risk.map(e => escHtml(e)).join('<br>'));
+    }
     if (d.img_visual_hierarchy) {
       kvRow(kv, 'First element', `<span class="badge hierarchy">${escHtml(d.img_visual_hierarchy)}</span>`);
     }
@@ -443,7 +603,15 @@
       kvRow(kv, 'Crop recommendation', escHtml(d.img_crop_recommendation));
     }
     if (d.img_logo_detected != null) {
-      kvRow(kv, 'Logo detected', boolBadge(d.img_logo_detected, d.img_logo_position));
+      const logoDetail = [d.img_logo_text, d.img_logo_position].filter(Boolean).join(' · ');
+      kvRow(kv, 'Advertiser logo', boolBadge(d.img_logo_detected, logoDetail || null));
+    }
+    if (d.img_logo_contrast_score != null) {
+      const wcag = d.img_logo_contrast_wcag;
+      const wcagClass = wcag === 'AAA' ? 'wcag-aaa' : wcag === 'AA' ? 'wcag-aa' : wcag === 'AA Large' ? 'wcag-large' : 'wcag-fail';
+      const justify = d.img_logo_contrast_justification ? `<br><span style="font-size:0.73rem;color:#6b7280;font-style:italic">${escHtml(d.img_logo_contrast_justification)}</span>` : '';
+      kvRow(kv, 'Logo contrast',
+        `<span class="badge ${wcagClass}" title="WCAG contrast ratio: ${d.img_logo_contrast_ratio}:1">${wcag}</span>&nbsp; score ${(d.img_logo_contrast_score * 100).toFixed(0)}${justify}`);
     }
     if (d.img_multi_view_has_multiple_shots != null) {
       const mv = d.img_multi_view_has_multiple_shots;
@@ -465,7 +633,7 @@
     kvRow(kv, 'Coupon',           boolBadge(d.img_has_coupon, d.img_coupon_text));
 
     if (d.img_language_clarity_score != null) {
-      const bar = scoreBar('Language clarity', d.img_language_clarity_score);
+      const bar = scoreBar('Language clarity', d.img_language_clarity_score, d.img_justification_message_clarity);
       bar.style.margin = '12px 0 4px';
       kv.appendChild(document.createElement('div')); // grid filler
       const wrap = document.createElement('div');
@@ -491,43 +659,42 @@
     return kv;
   }
 
-  function rubricCard() {
-    const div = document.createElement('div');
-    div.className = 'kv-grid';
-    const sections = [
-      ['Attention', 'Is there a clear focal point and visual hierarchy that guides the eye to the most important element first?'],
-      ['Message clarity', 'Can a user understand what is offered in 1–2 seconds on mobile (headline, value, CTA) without reading dense text?'],
-      ['Offer strength', 'How clearly and prominently are price, discount and key value props communicated?'],
-      ['Branding', 'Is the brand/logo visible, legible and distinctive enough to avoid confusion with competitors?'],
-      ['Product presentation', 'Is it obvious what is being sold, are views complementary (multi-view), and is the product shown in a fitting context?'],
-      ['Simplicity vs clutter', 'Are there few, well-organized elements with enough whitespace, or many items competing for attention?'],
-      ['Emotion & craft', 'Does the creative feel polished and emotionally appropriate for the category and message?'],
-    ];
-    sections.forEach(([title, desc]) => {
-      const k = document.createElement('div');
-      k.className = 'kv-key';
-      k.textContent = title;
-      const v = document.createElement('div');
-      v.className = 'kv-val';
-      v.textContent = desc;
-      div.appendChild(k);
-      div.appendChild(v);
-    });
-    return div;
-  }
 
   // ── Helpers ──────────────────────────────────────────────────────────────── //
 
-  function scoreBar(label, val) {
+  const SCORE_TOOLTIPS = {
+    'Attention':              'Is there a clear focal point and visual hierarchy that guides the eye to the most important element first?',
+    'Message clarity':        'Can a user understand what is offered in 1\u20132 seconds on mobile (headline, value prop, CTA) without reading dense text?',
+    'Branding':               'Is the brand/logo visible, legible and distinctive enough to avoid confusion with competitors?',
+    'Offer strength':         'How clearly and prominently are price, discount and key value props communicated?',
+    'Product presentation':   'Is it obvious what is being sold? Are views complementary (multi-view) and shown in a fitting context?',
+    'Readability':            'Can all text be comfortably read on a mobile screen? Combines text size, contrast and density.',
+    'Safe zone':              'Are critical elements (price, logo, headline) placed within Meta ad safe zones, avoiding UI overlays?',
+    'Text contrast vs bg':    'WCAG 2.0 contrast ratio between text and its background. AA (\u22654.5:1) = good, AA Large (\u22653.0:1) = acceptable, Fail (<3.0:1) = poor.',
+    'Whitespace':             'Is there enough breathing room between elements, or does the layout feel cramped and cluttered?',
+    'Language clarity':       'Is the text grammatically correct, clear and appropriate for the target audience and locale?',
+  };
+
+  function scoreBar(label, val, explain, ratio, wcag, ratioMin, ratioMax) {
     const pct   = Math.min(Math.max(val * 100, 0), 100);
-    const color = pct >= 60 ? 'green' : pct >= 30 ? 'yellow' : 'red';
-    const row   = document.createElement('div');
-    row.className = 'score-row';
-    row.innerHTML = `
-      <span class="score-label">${escHtml(label)}</span>
-      <div class="bar-wrap"><div class="bar-fill ${color}" style="width:${pct}%"></div></div>
-      <span class="score-val">${val.toFixed(2)}</span>`;
-    return row;
+    const color = pct > 80 ? 'green' : pct > 50 ? 'yellow' : 'red';
+    const wcagClass = wcag === 'AAA' ? 'wcag-aaa' : wcag === 'AA' ? 'wcag-aa' : wcag === 'AA Large' ? 'wcag-large' : wcag === 'Fail' ? 'wcag-fail' : '';
+    const rangeHint = (ratioMin != null && ratioMax != null)
+      ? `Contrast ratios range from ${ratioMin}:1 to ${ratioMax}:1 (WCAG 2.0)` : '';
+    const wcagBadge = wcag ? `<span class="badge ${wcagClass}" title="${rangeHint}">${wcag}</span>` : '';
+    const tip = SCORE_TOOLTIPS[label] || '';
+    const infoHtml = tip ? `<span class="info-icon">i</span><span class="tooltip">${escHtml(tip)}</span>` : '';
+    const block = document.createElement('div');
+    block.className = 'score-block';
+    block.innerHTML = `
+      <div class="score-row">
+        <span class="score-label">${escHtml(label)}${infoHtml}</span>
+        <div class="bar-wrap"><div class="bar-fill ${color}" style="width:${pct}%"></div></div>
+        <span class="score-val">${val.toFixed(2)}</span>
+        ${wcagBadge}
+      </div>
+      ${explain ? `<div class="score-explain">${escHtml(explain)}</div>` : ''}`;
+    return block;
   }
 
   function boolBadge(val, detail) {
@@ -547,6 +714,7 @@
     parent.appendChild(k);
     parent.appendChild(v);
   }
+
 
   function escHtml(s) {
     return String(s ?? '')
